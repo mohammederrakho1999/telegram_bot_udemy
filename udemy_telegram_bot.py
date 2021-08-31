@@ -1,11 +1,15 @@
+from custom_exception import *
 import os
 import telebot
 import re
+import requests
+import tldextract
+from bs4 import BeautifulSoup
 
 
 with open('credentils.txt') as f:
     API_KEY = f.readlines()[0].split("=")[1]
-
+dictionary = {"outline": [], "course_content": []}
 bot = telebot.TeleBot(API_KEY)
 
 
@@ -21,20 +25,104 @@ def find_url(text):
 
 
     """
-    return re.findall('(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+', text)
+
+    return re.findall(
+        '(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+', str(text))
 
 
-def crawl_url(urls):
+def crawl_url(url):
     """
     crawl the given url
     """
-    pass
+
+    try:
+        res = requests.get(url)
+
+        if tldextract.extract(res.url).domain != "udemy":
+            raise InvalidUdemyUrl(f"'{url}' invalid udemy url!")
+    except Exception as e:
+        raise InvalidUrlError(f"{url} not a valid url")
+
+    return BeautifulSoup(res.text, 'html.parser')
+
+
+@bot.message_handler(commands=["title"])
+def title_response(message):
+    """reply to the user.
+
+    """
+    try:
+        bot.send_chat_action(message.chat.id, "typing")
+
+        soup = crawl_url(dictionary["url"])
+        title = soup.find_all("h1", "udlite-heading-xl")[0].string
+        outcome = soup.find_all(
+            "span", "what-you-will-learn--objective-item--ECarc")
+
+        for item in outcome:
+            dictionary["outline"].append(item.string)
+
+        course_content = soup.find(
+            "span", "curriculum--content-length--1XzLS").get_text().split("•")
+
+        for i in range(len(course_content)):
+            course_content[i-1].replace(u'\xa0', u' ')
+            dictionary["course_content"].append(course_content[i])
+
+        # continue here tomorrow for scraping the other fields
+
+        bot.reply_to(message, title)
+    except Exception as e:
+        raise InvalidUdemyUrl("some sort of probleme")
+
+
+@bot.message_handler(commands=["begin"])
+def welcome_message(message):
+    """reply to the user.
+
+    """
+    bot.send_chat_action(message.chat.id, "typing")
+    bot.reply_to(
+        message, "Hi There, \nWelcome to udemy bot, \nWhat can i do for you today?")
+
+
+@bot.message_handler(commands=["objectives"])
+def objectives_response(message):
+    try:
+        if len(dictionary["outline"]) >= 2:
+            list_of_messages = dictionary["outline"]
+            msg = '.\n\n•'.join(list_of_messages)
+            bot.reply_to(
+                message, msg)
+        else:
+            text = "Hi, The list of objectives is not too long, Just don't invest in this course"
+            bot.send_message(message.chat.id, text)
+    except Exception as e:
+        InvalidUrlError("some sort of error related to the url")
+
+
+@bot.message_handler(commands=["help", "start"])
+def send_instructions(message):
+    bot.send_chat_action(message.chat.id, "typing")
+    msg = f"Hi {message.from_user.first_name}, \n below are the instruction in order to use this bot. \n\n /begin: to start the conversation with the bot. \n /title: give you the title of the course. \n /objectives: give you the materials that you gonna learn from the provided course."
+    bot.send_message(message.chat.id, msg)
+
+
+@bot.message_handler(commands=["content"])
+def course_content(message):
+
+    list_of_content = dictionary["course_content"]
+    msg = '.\n\n•'.join(list_of_content)
+    bot.reply_to(
+        message, msg)
 
 
 @bot.message_handler(func=lambda m: True)
-def great(message):
-    urls = find_url(str(message))
-    bot.reply_to(message, urls)
+def second_response(message):
+    url = find_url(str(message))[0]
+    dictionary["url"] = url
+    bot.reply_to(
+        message, "okey i see what can i do, what exaclty you wanna know")
 
 
 bot.polling()
