@@ -9,21 +9,23 @@ from bs4 import BeautifulSoup
 
 with open('credentils.txt') as f:
     API_KEY = f.readlines()[0].split("=")[1]
-dictionary = {"outline": [], "course_content": []}
+dictionary = {"objectives": [], "course_content": [], "modules": []}
 bot = telebot.TeleBot(API_KEY)
 
 
 def find_url(text):
-    """
-    find all the urls format present in a string.
+    """extract the target url from text.
 
-    parameters:
-         text: string from where the urls should be extracted.
+    Parameters
+    ----------
 
-    output:
-         list of urls.
+    text : str
+        String from which url to be extracted.
 
-
+    Returns
+    -------
+    Optional[str]
+        Return url if present in the given string.
     """
 
     return re.findall(
@@ -31,8 +33,17 @@ def find_url(text):
 
 
 def crawl_url(url):
-    """
-    crawl the given url
+    """crawl the given url.
+
+    Parameters
+    ----------
+    url : str
+        The url to be crawled.
+
+    Returns
+    -------
+    return a Beautifulsoup object
+
     """
 
     try:
@@ -56,11 +67,11 @@ def title_response(message):
 
         soup = crawl_url(dictionary["url"])
         title = soup.find_all("h1", "udlite-heading-xl")[0].string
-        outcome = soup.find_all(
+        objectives = soup.find_all(
             "span", "what-you-will-learn--objective-item--ECarc")
 
-        for item in outcome:
-            dictionary["outline"].append(item.string)
+        for objective in objectives:
+            dictionary["objectives"].append(objective.string)
 
         course_content = soup.find(
             "span", "curriculum--content-length--1XzLS").get_text().split("•")
@@ -68,6 +79,12 @@ def title_response(message):
         for i in range(len(course_content)):
             course_content[i-1].replace(u'\xa0', u' ')
             dictionary["course_content"].append(course_content[i])
+
+        modules = soup.find_all(
+            "span", "section--section-title--8blTh")
+
+        for module in modules:
+            dictionary["modules"].append(module.string)
 
         # continue here tomorrow for scraping the other fields
 
@@ -89,8 +106,8 @@ def welcome_message(message):
 @bot.message_handler(commands=["objectives"])
 def objectives_response(message):
     try:
-        if len(dictionary["outline"]) >= 2:
-            list_of_messages = dictionary["outline"]
+        if len(dictionary["objectives"]) >= 2:
+            list_of_messages = dictionary["objectives"]
             msg = '.\n\n•'.join(list_of_messages)
             bot.reply_to(
                 message, msg)
@@ -112,6 +129,15 @@ def send_instructions(message):
 def course_content(message):
 
     list_of_content = dictionary["course_content"]
+    msg = '.\n\n•'.join(list_of_content)
+    bot.reply_to(
+        message, msg)
+
+
+@bot.message_handler(commands=["modules"])
+def course_modules_snapshot(message):
+
+    list_of_content = dictionary["modules"]
     msg = '.\n\n•'.join(list_of_content)
     bot.reply_to(
         message, msg)
