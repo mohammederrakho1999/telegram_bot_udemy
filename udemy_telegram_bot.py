@@ -59,7 +59,16 @@ def crawl_url(url):
 
 @bot.message_handler(commands=["title"])
 def title_response(message):
-    """reply to the user.
+    """get user information about course.
+
+    Parameters
+    ----------
+    url : str
+        message object from telegram.
+
+    Returns
+    -------
+    reply object from telegram.
 
     """
     try:
@@ -86,7 +95,12 @@ def title_response(message):
         for module in modules:
             dictionary["modules"].append(module.string)
 
-        # continue here tomorrow for scraping the other fields
+        description = soup.find(
+            attrs={"data-purpose": "safely-set-inner-html:description:description"}).get_text()
+
+        dictionary["description"] = description
+
+        # sentiment analysis of reviews
 
         bot.reply_to(message, title)
     except Exception as e:
@@ -127,7 +141,7 @@ def send_instructions(message):
 
 @bot.message_handler(commands=["content"])
 def course_content(message):
-
+    bot.send_chat_action(message.chat.id, "typing")
     list_of_content = dictionary["course_content"]
     msg = '.\n\n•'.join(list_of_content)
     bot.reply_to(
@@ -136,9 +150,18 @@ def course_content(message):
 
 @bot.message_handler(commands=["modules"])
 def course_modules_snapshot(message):
-
+    bot.send_chat_action(message.chat.id, "typing")
     list_of_content = dictionary["modules"]
     msg = '.\n\n•'.join(list_of_content)
+    bot.reply_to(
+        message, msg)
+
+
+@bot.message_handler(commands=["description"])
+def course_description(message):
+    bot.send_chat_action(message.chat.id, "typing")
+    description = dictionary["description"]
+    msg = description
     bot.reply_to(
         message, msg)
 
@@ -148,7 +171,7 @@ def second_response(message):
     url = find_url(str(message))[0]
     dictionary["url"] = url
     bot.reply_to(
-        message, "okey i see what can i do, what exaclty you wanna know")
+        message, "okey i see what can i do, \nwhat exaclty you wanna know")
 
 
 bot.polling()
