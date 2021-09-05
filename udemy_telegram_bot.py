@@ -7,10 +7,13 @@ import tldextract
 from bs4 import BeautifulSoup
 
 
-with open('credentils.txt') as f:
-    API_KEY = f.readlines()[0].split("=")[1]
+this_dir = os.path.dirname(os.path.abspath(__file__))
+config.from_pyfile(os.path.join(this_dir, "config.py"))
+token = config["TOKEN"]
+bot = telebot.TeleBot(token)
+
 dictionary = {"objectives": [], "course_content": [], "modules": []}
-bot = telebot.TeleBot(API_KEY)
+
 
 
 def find_url(text):
